@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customizable Spin The Wheel - Showcase</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800;900&display=swap');
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      touch-action: manipulation;
+      overflow: hidden;
+    }
+    .glass {
+      background: rgba(15, 23, 42, 0.7);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(100, 116, 139, 0.5);
+      border-radius: 4px;
+    }
+    .wheel-glow {
+      box-shadow: 0 0 80px -10px rgba(168, 85, 247, 0.25);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 h-screen w-screen flex flex-col justify-between selection:bg-purple-500 selection:text-white relative overflow-hidden">
+
+  <!-- Ambient Animated Background Glow -->
+  <div class="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden z-0">
+    <div id="ambient-glow" class="w-[600px] h-[600px] rounded-full bg-gradient-to-tr from-purple-600/20 via-pink-600/20 to-amber-500/10 blur-[120px] transition-all duration-700"></div>
+  </div>
+
+  <!-- Minimal Floating Header -->
+  <header class="w-full z-20 py-4 px-6 flex justify-between items-center relative">
+    <!-- Active Wheel Title & Breadcrumb Navigation -->
+    <div class="flex items-center gap-3">
+      <div id="wheel-breadcrumbs" class="flex items-center gap-2 text-sm font-semibold text-slate-300 glass px-4 py-2 rounded-2xl shadow-lg border border-slate-800/80">
+        <!-- Breadcrumb items populated by JS -->
+      </div>
+    </div>
+
+    <!-- Toggle Customizer Button -->
+    <button id="toggle-drawer-btn" class="glass px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold tracking-wide hover:bg-slate-800/80 transition flex items-center gap-2 text-slate-200 border border-slate-700/60 shadow-lg cursor-pointer">
+      <i class="fa-solid fa-sliders text-purple-400"></i>
+      <span>Customize</span>
+    </button>
+  </header>
+
+  <!-- Showcase Stage: Centered Wheel -->
+  <main class="flex-1 flex flex-col items-center justify-center z-10 px-4 relative my-auto">
+    
+    <!-- Title Badge -->
+    <div class="text-center mb-3 sm:mb-5">
+      <span id="current-wheel-badge" class="px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-widest bg-purple-500/20 text-purple-300 border border-purple-500/30 shadow-inner">
+        Master Wheel
+      </span>
+      <h2 id="current-wheel-title" class="text-3xl sm:text-4xl md:text-5xl font-black text-white mt-2 tracking-tight drop-shadow-md">
+        Master Decision Wheel
+      </h2>
+    </div>
+
+    <!-- Canvas Wrapper with Shadow & Ticker Pointer -->
+    <div class="relative flex items-center justify-center p-2 sm:p-4 my-1 sm:my-3">
+      <!-- Wheel Pointer / Ticker -->
+      <div class="absolute -top-4 z-20 w-10 h-12 flex justify-center filter drop-shadow-[0_6px_8px_rgba(0,0,0,0.6)]">
+        <div class="w-0 h-0 border-l-[18px] border-l-transparent border-r-[18px] border-r-transparent border-t-[32px] border-t-amber-400"></div>
+      </div>
+
+      <!-- Main Wheel Canvas -->
+      <div class="rounded-full p-2 glass wheel-glow border border-slate-700/50 shadow-2xl">
+        <canvas id="wheelCanvas" class="max-w-full h-auto cursor-pointer transition-transform duration-100 ease-out active:scale-[0.99]"></canvas>
+      </div>
+    </div>
+
+    <!-- Spin Action Button -->
+    <div class="flex items-center gap-4 mt-4 sm:mt-6">
+      <button id="spin-btn" class="px-12 py-4 sm:py-5 bg-gradient-to-r from-amber-400 via-orange-500 to-pink-500 hover:from-amber-300 hover:to-pink-400 text-slate-950 font-black text-xl sm:text-2xl rounded-full shadow-2xl shadow-orange-500/30 hover:shadow-orange-500/50 transform active:scale-95 transition cursor-pointer tracking-wider flex items-center gap-3">
+        <i class="fa-solid fa-play text-lg sm:text-xl"></i> SPIN NOW
+      </button>
+    </div>
+
+  </main>
+
+  <!-- Bottom Showcase Footer -->
+  <footer class="w-full text-center py-3 text-xs text-slate-500 z-10 font-medium">
+    Click <span class="text-slate-400 font-semibold">SPIN NOW</span> or tap the wheel to start
+  </footer>
+
+  <!-- Slide-Over Drawer: Wheel Customizer & Nesting Editor -->
+  <div id="drawer-backdrop" class="fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300"></div>
+  
+  <aside id="editor-drawer" class="fixed top-0 right-0 z-50 h-full w-full max-w-md glass border-l border-slate-800 shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col justify-between p-6">
+    
+    <div>
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+        <div>
+          <h3 class="text-lg font-extrabold flex items-center gap-2 text-white">
+            <i class="fa-solid fa-sliders text-purple-400"></i> Customize Wheel
+          </h3>
+          <p class="text-xs text-slate-400 mt-0.5">Edit slices, colors, or create sub-wheels</p>
+        </div>
+        <button id="close-drawer-btn" class="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Slice Editor Header -->
+      <div class="flex items-center justify-between my-4">
+        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Wheel Slices</span>
+        <button id="add-slice-btn" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 text-white">
+          <i class="fa-solid fa-plus"></i> Add Slice
+        </button>
+      </div>
+
+      <!-- Slice List Container -->
+      <div id="slice-list" class="max-h-[calc(100vh-280px)] overflow-y-auto custom-scrollbar space-y-3 pr-1">
+        <!-- Dynamic Slice Cards generated here -->
+      </div>
+    </div>
+
+    <!-- Quick Preset & Nested Wheel Navigation Footer -->
+    <div class="pt-4 border-t border-slate-800 flex flex-col gap-2">
+      <label class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Available Wheels</label>
+      <div id="nested-wheels-list" class="flex flex-wrap gap-2 max-h-24 overflow-y-auto custom-scrollbar">
+        <!-- Nested wheel quick badges generated here -->
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- Modal Announcement for Winner / Sub-Wheel Trigger -->
+  <div id="result-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md hidden transition-opacity duration-300 opacity-0">
+    <div class="glass max-w-md w-full rounded-2xl p-6 border border-slate-700 shadow-2xl text-center transform scale-95 transition-transform duration-300 id-modal-content">
+      
+      <div id="modal-icon-container" class="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 text-3xl">
+        <i id="modal-icon" class="fa-solid fa-trophy"></i>
+      </div>
+
+      <p id="modal-subtitle" class="text-xs uppercase tracking-widest font-bold text-slate-400">Result Selected</p>
+      <h3 id="modal-title" class="text-2xl font-extrabold text-white mt-1 mb-2">Mystery Category!</h3>
+      <p id="modal-description" class="text-slate-300 text-sm mb-6">
+        This outcome triggers a sub-wheel! Are you ready to spin for the final reward?
+      </p>
+
+      <div class="flex items-center justify-center gap-3">
+        <button id="modal-action-btn" class="w-full py-3.5 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg transition">
+          Continue
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // --- Data Models & Initial State ---
+    const DEFAULT_DATA = {
+      activeWheelId: "main",
+      wheels: {
+        "main": {
+          id: "main",
+          title: "Master Category Wheel",
+          slices: [
+            { id: "s1", text: "Instant $50", color: "#10b981", type: "result" },
+            { id: "s2", text: "Food Wheel 🍔", color: "#f59e0b", type: "nested", targetWheelId: "food_wheel" },
+            { id: "s3", text: "Try Again", color: "#64748b", type: "result" },
+            { id: "s4", text: "Activity Wheel 🎮", color: "#8b5cf6", type: "nested", targetWheelId: "activity_wheel" },
+            { id: "s5", text: "Jackpot $500", color: "#ec4899", type: "result" },
+            { id: "s6", text: "Mystery Prize 🎁", color: "#06b6d4", type: "nested", targetWheelId: "mystery_wheel" }
+          ]
+        },
+        "food_wheel": {
+          id: "food_wheel",
+          parentId: "main",
+          title: "Food Picker Wheel 🍕",
+          slices: [
+            { id: "f1", text: "Pizza Night 🍕", color: "#ef4444", type: "result" },
+            { id: "f2", text: "Sushi Feast 🍣", color: "#10b981", type: "result" },
+            { id: "f3", text: "Burger Combo 🍔", color: "#f59e0b", type: "result" },
+            { id: "f4", text: "Tacos 🌮", color: "#8b5cf6", type: "result" },
+            { id: "f5", text: "Ramen Bowl 🍜", color: "#06b6d4", type: "result" }
+          ]
+        },
+        "activity_wheel": {
+          id: "activity_wheel",
+          parentId: "main",
+          title: "Activity Picker Wheel 🎮",
+          slices: [
+            { id: "a1", text: "Video Games 🎮", color: "#6366f1", type: "result" },
+            { id: "a2", text: "Movie Night 🍿", color: "#ec4899", type: "result" },
+            { id: "a3", text: "Board Games 🎲", color: "#f59e0b", type: "result" },
+            { id: "a4", text: "Outdoor Walk 🌳", color: "#10b981", type: "result" }
+          ]
+        },
+        "mystery_wheel": {
+          id: "mystery_wheel",
+          parentId: "main",
+          title: "Mystery Rewards Wheel 🎁",
+          slices: [
+            { id: "m1", text: "VIP Pass 🎟️", color: "#a855f7", type: "result" },
+            { id: "m2", text: "$100 Gift Card 💳", color: "#3b82f6", type: "result" },
+            { id: "m3", text: "Extra Spin 🔄", color: "#10b981", type: "result" },
+            { id: "m4", text: "Better Luck Next Time", color: "#475569", type: "result" }
+          ]
+        }
+      }
+    };
+
+    let appData = JSON.parse(JSON.stringify(DEFAULT_DATA));
+
+    // --- State Variables ---
+    let currentAngle = 0; // Current rotation in radians
+    let isSpinning = false;
+    let canvas, ctx;
+    let CANVAS_SIZE = 500;
+
+    // Default Color Palette for new slices
+    const COLOR_PALETTE = [
+      "#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", 
+      "#06b6d4", "#ef4444", "#a855f7", "#14b8a6", "#f97316"
+    ];
+
+    // Audio Effects Synthesizer (Web Audio API)
+    class SoundEffects {
+      constructor() {
+        this.ctx = null;
+      }
+      init() {
+        if (!this.ctx) {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+      }
+      playTick() {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(420, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(120, this.ctx.currentTime + 0.04);
+        gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.04);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.04);
+      }
+      playWin() {
+        if (!this.ctx) return;
+        const notes = [261.63, 329.63, 392.00, 523.25];
+        notes.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime + idx * 0.1);
+          gain.gain.setValueAtTime(0.15, this.ctx.currentTime + idx * 0.1);
+          gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + idx * 0.1 + 0.3);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(this.ctx.currentTime + idx * 0.1);
+          osc.stop(this.ctx.currentTime + idx * 0.1 + 0.3);
+        });
+      }
+    }
+    const sound = new SoundEffects();
+
+    // --- DOM Elements ---
+    const spinBtn = document.getElementById('spin-btn');
+    const sliceListEl = document.getElementById('slice-list');
+    const addSliceBtn = document.getElementById('add-slice-btn');
+    const breadcrumbsEl = document.getElementById('wheel-breadcrumbs');
+    const wheelTitleEl = document.getElementById('current-wheel-title');
+    const wheelBadgeEl = document.getElementById('current-wheel-badge');
+    const nestedWheelsListEl = document.getElementById('nested-wheels-list');
+
+    // Drawer DOM Elements
+    const toggleDrawerBtn = document.getElementById('toggle-drawer-btn');
+    const closeDrawerBtn = document.getElementById('close-drawer-btn');
+    const editorDrawer = document.getElementById('editor-drawer');
+    const drawerBackdrop = document.getElementById('drawer-backdrop');
+
+    // Modal DOM Elements
+    const modalEl = document.getElementById('result-modal');
+    const modalTitleEl = document.getElementById('modal-title');
+    const modalSubtitleEl = document.getElementById('modal-subtitle');
+    const modalDescEl = document.getElementById('modal-description');
+    const modalIconEl = document.getElementById('modal-icon');
+    const modalIconContainer = document.getElementById('modal-icon-container');
+    const modalActionBtn = document.getElementById('modal-action-btn');
+
+    // --- Responsive Canvas Sizing ---
+    function updateCanvasDimensions() {
+      const windowHeight = window.innerHeight;
+      const windowWidth = window.innerWidth;
+      
+      // Compute responsive diameter
+      let targetSize = Math.min(windowWidth * 0.85, windowHeight * 0.48, 520);
+      targetSize = Math.max(targetSize, 280); // minimum size
+
+      CANVAS_SIZE = targetSize;
+      canvas.width = CANVAS_SIZE;
+      canvas.height = CANVAS_SIZE;
+      drawWheel();
+    }
+
+    // --- Initialize Application ---
+    window.addEventListener('DOMContentLoaded', () => {
+      canvas = document.getElementById('wheelCanvas');
+      ctx = canvas.getContext('2d');
+
+      window.addEventListener('resize', updateCanvasDimensions);
+      setupEventListeners();
+      updateCanvasDimensions();
+      renderApp();
+    });
+
+    function getCurrentWheel() {
+      return appData.wheels[appData.activeWheelId];
+    }
+
+    // --- Drawing Logic ---
+    function drawWheel() {
+      const activeWheel = getCurrentWheel();
+      const slices = activeWheel.slices;
+      const numSlices = slices.length;
+
+      ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+      if (numSlices === 0) {
+        // Draw Empty State
+        ctx.save();
+        ctx.translate(CANVAS_SIZE / 2, CANVAS_SIZE / 2);
+        ctx.fillStyle = '#334155';
+        ctx.beginPath();
+        ctx.arc(0, 0, CANVAS_SIZE / 2 - 15, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = 'bold 16px "Plus Jakarta Sans"';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('No Slices Configured', 0, 0);
+        ctx.restore();
+        return;
+      }
+
+      const arcSize = (Math.PI * 2) / numSlices;
+      const radius = CANVAS_SIZE / 2 - 10;
+      const centerX = CANVAS_SIZE / 2;
+      const centerY = CANVAS_SIZE / 2;
+
+      ctx.save();
+      ctx.translate(centerX, centerY);
+      ctx.rotate(currentAngle);
+
+      // Draw Slices
+      slices.forEach((slice, i) => {
+        const startArc = i * arcSize;
+        const endArc = startArc + arcSize;
+
+        // Slice Sector
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, radius, startArc, endArc);
+        ctx.closePath();
+        ctx.fillStyle = slice.color;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(15, 23, 42, 0.4)';
+        ctx.stroke();
+
+        // Slice Text & Icon Marker
+        ctx.save();
+        ctx.rotate(startArc + arcSize / 2);
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ffffff';
+
+        // Scale font relative to canvas radius
+        const fontSize = Math.max(12, Math.floor(radius / 14));
+        ctx.font = `800 ${fontSize}px "Plus Jakarta Sans"`;
+
+        // Add shadow to text for contrast
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+        ctx.shadowBlur = 5;
+
+        let label = slice.text;
+        if (slice.type === 'nested') {
+          label += " ➔";
+        }
+
+        // Truncate long text
+        const maxChars = Math.floor(radius / 15);
+        if (label.length > maxChars) {
+          label = label.substring(0, maxChars - 2) + '..';
+        }
+
+        ctx.fillText(label, radius - 20, 0);
+        ctx.restore();
+      });
+
+      // Draw Outer Rim Glow / Border
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.stroke();
+
+      // Draw Center Cap
+      const capRadius = Math.max(30, radius * 0.2);
+      ctx.beginPath();
+      ctx.arc(0, 0, capRadius, 0, Math.PI * 2);
+      ctx.fillStyle = '#0f172a';
+      ctx.fill();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#38bdf8';
+      ctx.stroke();
+
+      // Center Text
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `bold ${Math.max(11, capRadius * 0.4)}px "Plus Jakarta Sans"`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(activeWheel.slices.length > 0 ? "SPIN" : "EMPTY", 0, 0);
+
+      ctx.restore();
+    }
+
+    // --- Wheel Spin Logic ---
+    let lastTickSliceIndex = -1;
+
+    function spin() {
+      if (isSpinning) return;
+      
+      const activeWheel = getCurrentWheel();
+      if (activeWheel.slices.length < 2) {
+        openDrawer();
+        return;
+      }
+
+      sound.init();
+      isSpinning = true;
+      spinBtn.disabled = true;
+      spinBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+      // Calculate spin target
+      const numSlices = activeWheel.slices.length;
+      const sliceArc = (Math.PI * 2) / numSlices;
+      const randomSliceIndex = Math.floor(Math.random() * numSlices);
+
+      // Angle calculation to align pointer at top (-90 degrees)
+      const targetSliceCenter = randomSliceIndex * sliceArc + sliceArc / 2;
+      const targetAngleOffset = (Math.PI * 3 / 2) - targetSliceCenter;
+      
+      const fullSpins = 6 + Math.floor(Math.random() * 3);
+      const totalRotation = (fullSpins * Math.PI * 2) + targetAngleOffset;
+
+      const duration = 4800; // ms
+      const startTime = performance.now();
+      const initialAngle = currentAngle % (Math.PI * 2);
+
+      lastTickSliceIndex = -1;
+
+      function animateSpin(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+
+        // Exponential deceleration curve
+        const easeOut = 1 - Math.pow(1 - progress, 4.2);
+
+        currentAngle = initialAngle + (totalRotation - initialAngle) * easeOut;
+        drawWheel();
+
+        // Sound tick handling
+        const normalizedAngle = (Math.PI * 2 - (currentAngle % (Math.PI * 2))) % (Math.PI * 2);
+        const pointerAngle = (normalizedAngle + Math.PI * 3 / 2) % (Math.PI * 2);
+        const currentSliceIndex = Math.floor(pointerAngle / sliceArc) % numSlices;
+
+        if (currentSliceIndex !== lastTickSliceIndex) {
+          sound.playTick();
+          lastTickSliceIndex = currentSliceIndex;
+        }
+
+        if (progress < 1) {
+          requestAnimationFrame(animateSpin);
+        } else {
+          isSpinning = false;
+          spinBtn.disabled = false;
+          spinBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+          handleSpinResult(activeWheel.slices[randomSliceIndex]);
+        }
+      }
+
+      requestAnimationFrame(animateSpin);
+    }
+
+    // --- Result & Trigger Nested Wheel Handling ---
+    function handleSpinResult(slice) {
+      sound.playWin();
+
+      if (slice.type === 'nested' && slice.targetWheelId) {
+        const targetWheel = appData.wheels[slice.targetWheelId];
+        
+        modalTitleEl.textContent = slice.text;
+        modalSubtitleEl.textContent = "Sub-Wheel Unlocked!";
+        modalDescEl.textContent = `You landed on "${slice.text}". Ready to spin the ${targetWheel ? targetWheel.title : 'Sub-Wheel'}?`;
+        modalIconEl.className = "fa-solid fa-arrows-spin animate-spin";
+        modalIconContainer.className = "w-16 h-16 mx-auto mb-4 rounded-full bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-400 text-3xl";
+        
+        modalActionBtn.textContent = `Open ${targetWheel ? targetWheel.title : 'Sub-Wheel'} ➔`;
+        modalActionBtn.onclick = () => {
+          closeModal();
+          switchWheel(slice.targetWheelId);
+        };
+
+      } else {
+        // Standard Result
+        confetti({
+          particleCount: 100,
+          spread: 80,
+          origin: { y: 0.6 }
+        });
+
+        modalTitleEl.textContent = slice.text;
+        modalSubtitleEl.textContent = "Winner!";
+        modalDescEl.textContent = `Congratulations! You got: ${slice.text}`;
+        modalIconEl.className = "fa-solid fa-trophy";
+        modalIconContainer.className = "w-16 h-16 mx-auto mb-4 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 text-3xl";
+
+        modalActionBtn.textContent = "Great!";
+        modalActionBtn.onclick = closeModal;
+      }
+
+      openModal();
+    }
+
+    function openModal() {
+      modalEl.classList.remove('hidden');
+      setTimeout(() => {
+        modalEl.classList.remove('opacity-0');
+        modalEl.querySelector('.id-modal-content').classList.remove('scale-95');
+      }, 10);
+    }
+
+    function closeModal() {
+      modalEl.classList.add('opacity-0');
+      modalEl.querySelector('.id-modal-content').classList.add('scale-95');
+      setTimeout(() => {
+        modalEl.classList.add('hidden');
+      }, 300);
+    }
+
+    // --- Drawer Controls ---
+    function openDrawer() {
+      drawerBackdrop.classList.remove('hidden');
+      setTimeout(() => {
+        drawerBackdrop.classList.remove('opacity-0');
+        editorDrawer.classList.remove('translate-x-full');
+      }, 10);
+    }
+
+    function closeDrawer() {
+      drawerBackdrop.classList.add('opacity-0');
+      editorDrawer.classList.add('translate-x-full');
+      setTimeout(() => {
+        drawerBackdrop.classList.add('hidden');
+      }, 300);
+    }
+
+    // --- Render Configuration & UI ---
+    function renderApp() {
+      const activeWheel = getCurrentWheel();
+
+      // Update Title & Badges
+      wheelTitleEl.textContent = activeWheel.title;
+      if (activeWheel.parentId) {
+        wheelBadgeEl.textContent = "Sub-Wheel Tier";
+        wheelBadgeEl.className = "px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-widest bg-pink-500/20 text-pink-300 border border-pink-500/30 shadow-inner";
+      } else {
+        wheelBadgeEl.textContent = "Master Wheel";
+        wheelBadgeEl.className = "px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-widest bg-purple-500/20 text-purple-300 border border-purple-500/30 shadow-inner";
+      }
+
+      renderBreadcrumbs();
+      renderSliceEditorList();
+      renderNestedWheelBadges();
+      drawWheel();
+    }
+
+    function renderBreadcrumbs() {
+      breadcrumbsEl.innerHTML = '';
+      const trail = [];
+      let curr = getCurrentWheel();
+
+      while (curr) {
+        trail.unshift(curr);
+        curr = curr.parentId ? appData.wheels[curr.parentId] : null;
+      }
+
+      trail.forEach((wheel, idx) => {
+        if (idx > 0) {
+          const chevron = document.createElement('span');
+          chevron.className = "text-slate-600";
+          chevron.innerHTML = '<i class="fa-solid fa-chevron-right text-xs"></i>';
+          breadcrumbsEl.appendChild(chevron);
+        }
+
+        const btn = document.createElement('button');
+        btn.className = `transition hover:text-white flex items-center gap-1.5 ${wheel.id === appData.activeWheelId ? 'text-purple-400 font-bold' : 'text-slate-400'}`;
+        btn.innerHTML = `<i class="fa-solid ${idx === 0 ? 'fa-house' : 'fa-circle-nodes'}"></i> ${wheel.title}`;
+        btn.onclick = () => switchWheel(wheel.id);
+        breadcrumbsEl.appendChild(btn);
+      });
+    }
+
+    function renderSliceEditorList() {
+      sliceListEl.innerHTML = '';
+      const activeWheel = getCurrentWheel();
+
+      if (activeWheel.slices.length === 0) {
+        sliceListEl.innerHTML = `<div class="text-center py-8 text-slate-500 text-sm">No slices yet. Click "Add Slice" above!</div>`;
+        return;
+      }
+
+      activeWheel.slices.forEach((slice, idx) => {
+        const sliceCard = document.createElement('div');
+        sliceCard.className = "p-3 bg-slate-900/90 rounded-xl border border-slate-800 flex flex-col gap-2 shadow-sm";
+
+        // Slice Header Row
+        const topRow = document.createElement('div');
+        topRow.className = "flex items-center gap-2";
+
+        topRow.innerHTML = `
+          <input type="color" value="${slice.color}" data-idx="${idx}" class="color-picker w-7 h-7 rounded-lg cursor-pointer bg-transparent border-0">
+          <input type="text" value="${slice.text}" data-idx="${idx}" class="text-input flex-1 bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1 text-sm text-white focus:outline-none focus:border-purple-500">
+          <button data-idx="${idx}" class="delete-btn text-slate-500 hover:text-red-400 p-1 transition"><i class="fa-solid fa-trash-can"></i></button>
+        `;
+
+        // Action / Type Selection Row
+        const bottomRow = document.createElement('div');
+        bottomRow.className = "flex items-center justify-between text-xs pt-1 border-t border-slate-800/60";
+
+        let nestedOptionsHTML = '';
+        if (slice.type === 'nested') {
+          const availableWheels = Object.values(appData.wheels).filter(w => w.id !== activeWheel.id);
+          const options = availableWheels.map(w => 
+            `<option value="${w.id}" ${slice.targetWheelId === w.id ? 'selected' : ''}>${w.title}</option>`
+          ).join('');
+
+          nestedOptionsHTML = `
+            <select data-idx="${idx}" class="target-wheel-select bg-slate-800 border border-slate-700 rounded px-2 py-1 text-purple-300 focus:outline-none">
+              ${options}
+              <option value="__create_new__">+ Create New Wheel...</option>
+            </select>
+          `;
+        }
+
+        bottomRow.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="text-slate-400 font-medium">Action:</span>
+            <select data-idx="${idx}" class="type-select bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-200 focus:outline-none">
+              <option value="result" ${slice.type === 'result' ? 'selected' : ''}>Direct Reward</option>
+              <option value="nested" ${slice.type === 'nested' ? 'selected' : ''}>Open Sub-Wheel ➔</option>
+            </select>
+          </div>
+          ${nestedOptionsHTML}
+        `;
+
+        sliceCard.appendChild(topRow);
+        sliceCard.appendChild(bottomRow);
+        sliceListEl.appendChild(sliceCard);
+      });
+
+      // Bind slice editor events
+      sliceListEl.querySelectorAll('.color-picker').forEach(input => {
+        input.addEventListener('change', (e) => {
+          const idx = e.target.dataset.idx;
+          activeWheel.slices[idx].color = e.target.value;
+          drawWheel();
+        });
+      });
+
+      sliceListEl.querySelectorAll('.text-input').forEach(input => {
+        input.addEventListener('input', (e) => {
+          const idx = e.target.dataset.idx;
+          activeWheel.slices[idx].text = e.target.value;
+          drawWheel();
+        });
+      });
+
+      sliceListEl.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const idx = btn.dataset.idx;
+          activeWheel.slices.splice(idx, 1);
+          renderApp();
+        });
+      });
+
+      sliceListEl.querySelectorAll('.type-select').forEach(select => {
+        select.addEventListener('change', (e) => {
+          const idx = e.target.dataset.idx;
+          const slice = activeWheel.slices[idx];
+          slice.type = e.target.value;
+
+          if (slice.type === 'nested' && !slice.targetWheelId) {
+            const newSubId = `sub_${Date.now()}`;
+            appData.wheels[newSubId] = {
+              id: newSubId,
+              parentId: activeWheel.id,
+              title: `${slice.text || 'Sub'} Wheel`,
+              slices: [
+                { id: "sub1", text: "Option A", color: "#10b981", type: "result" },
+                { id: "sub2", text: "Option B", color: "#3b82f6", type: "result" }
+              ]
+            };
+            slice.targetWheelId = newSubId;
+          }
+          renderApp();
+        });
+      });
+
+      sliceListEl.querySelectorAll('.target-wheel-select').forEach(select => {
+        select.addEventListener('change', (e) => {
+          const idx = e.target.dataset.idx;
+          const val = e.target.value;
+          const slice = activeWheel.slices[idx];
+
+          if (val === '__create_new__') {
+            const newSubId = `sub_${Date.now()}`;
+            appData.wheels[newSubId] = {
+              id: newSubId,
+              parentId: activeWheel.id,
+              title: `New Sub-Wheel`,
+              slices: [
+                { id: "s1", text: "Option 1", color: "#f59e0b", type: "result" },
+                { id: "s2", text: "Option 2", color: "#8b5cf6", type: "result" }
+              ]
+            };
+            slice.targetWheelId = newSubId;
+          } else {
+            slice.targetWheelId = val;
+          }
+          renderApp();
+        });
+      });
+    }
+
+    function renderNestedWheelBadges() {
+      nestedWheelsListEl.innerHTML = '';
+      const allWheels = Object.values(appData.wheels);
+
+      allWheels.forEach(w => {
+        const btn = document.createElement('button');
+        const isActive = w.id === appData.activeWheelId;
+        btn.className = `px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${
+          isActive 
+            ? 'bg-purple-600 text-white shadow-md' 
+            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+        }`;
+        btn.innerHTML = `<i class="fa-solid fa-circle-dot text-[10px] ${isActive ? 'text-amber-300' : 'text-slate-500'}"></i> ${w.title}`;
+        btn.onclick = () => {
+          switchWheel(w.id);
+          closeDrawer();
+        };
+        nestedWheelsListEl.appendChild(btn);
+      });
+    }
+
+    // --- Navigation & Helper Functions ---
+    function switchWheel(wheelId) {
+      if (!appData.wheels[wheelId]) return;
+      appData.activeWheelId = wheelId;
+      currentAngle = 0;
+      renderApp();
+    }
+
+    function setupEventListeners() {
+      spinBtn.addEventListener('click', spin);
+      canvas.addEventListener('click', spin);
+
+      toggleDrawerBtn.addEventListener('click', openDrawer);
+      closeDrawerBtn.addEventListener('click', closeDrawer);
+      drawerBackdrop.addEventListener('click', closeDrawer);
